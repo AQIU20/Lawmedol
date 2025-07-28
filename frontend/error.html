@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Analyzer - 连接错误</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .error-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .error-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+        
+        .error-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .error-message {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .steps {
+            text-align: left;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .steps ol {
+            margin: 0;
+            padding-left: 20px;
+        }
+        
+        .steps li {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+        
+        .retry-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .retry-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .status {
+            margin-top: 20px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <div class="error-icon">⚖️</div>
+        <div class="error-title">连接失败</div>
+        <div class="error-message">
+            无法连接到 Streamlit 后端服务。请确保后端服务正在运行。
+        </div>
+        
+        <div class="steps">
+            <strong>解决步骤：</strong>
+            <ol>
+                <li>打开命令行终端</li>
+                <li>进入项目目录：<code>cd backend</code></li>
+                <li>启动 Streamlit 服务：<code>streamlit run app.py</code></li>
+                <li>等待服务启动完成（通常需要 30-60 秒）</li>
+                <li>点击下方"重试"按钮</li>
+            </ol>
+        </div>
+        
+        <button class="retry-button" onclick="retryConnection()">🔄 重试连接</button>
+        
+        <div class="status" id="status">
+            正在检查连接状态...
+        </div>
+    </div>
+
+    <script>
+        function retryConnection() {
+            const status = document.getElementById('status');
+            status.textContent = '正在检查连接...';
+            
+            // 尝试连接到 Streamlit 服务
+            fetch('http://localhost:8501')
+                .then(response => {
+                    if (response.ok) {
+                        status.textContent = '连接成功！正在重新加载...';
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        status.textContent = '服务响应异常，请检查 Streamlit 服务状态';
+                    }
+                })
+                .catch(error => {
+                    status.textContent = '连接失败，请确保 Streamlit 服务正在运行';
+                });
+        }
+        
+        // 页面加载时自动检查连接
+        window.addEventListener('load', () => {
+            setTimeout(retryConnection, 1000);
+        });
+        
+        // 定期检查连接状态
+        setInterval(retryConnection, 10000); // 每10秒检查一次
+    </script>
+</body>
+</html> 

@@ -1,0 +1,55 @@
+{
+  "name": "legal-analyzer",
+  "version": "1.0.0",
+  "description": "Legal Analyzer - 法律案例分析工具",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "dist": "electron-builder --publish=never"
+  },
+  "keywords": [
+    "legal",
+    "analyzer",
+    "electron",
+    "streamlit"
+  ],
+  "author": "Legal Analyzer Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "build": {
+    "appId": "com.legalanalyzer.app",
+    "productName": "Legal Analyzer",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+} 
