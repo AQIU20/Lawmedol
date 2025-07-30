@@ -1,0 +1,20 @@
+
+#启动
+set APP_PORT=8501
+cd /d E:\Lawmedol\backend
+streamlit run app.py --server.port %APP_PORT% --server.address 127.0.0.1 --server.headless true
+
+cd /d E:\Lawmedol\frontend
+set APP_URL=http://127.0.0.1:8501
+npm start
+
+
+#删除索引
+del /f /q legal_corpus\law_faiss.index 2>nul
+del /f /q legal_corpus\law_meta.pkl   2>nul
+
+
+#构建索引
+conda activate lawmedol
+cd /d E:\Lawmedol\backend
+python -c "from utils.rag_system import build_index; build_index(corpus_dir='backend/legal_corpus', index_dir='backend/legal_corpus')"

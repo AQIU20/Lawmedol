@@ -1,276 +1,283 @@
-"""
-RAG (Retrieval-Augmented Generation) 系统
-用于构建法条向量库和检索相关法条
-"""
-
+from __future__ import annotations
 import os
+import re
 import pickle
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Tuple, Iterable, Dict
+
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from typing import List, Dict, Optional, Tuple
-import logging
-import re
 
-logger = logging.getLogger(__name__)
+# --- 全局参数 ---
+DEFAULT_CORPUS_DIR = Path(__file__).resolve().parents[1] / "legal_corpus"
+# 为了简单，把索引也放在 legal_corpus 下；如需放 storage，改成 parents[1]/"storage"
+DEFAULT_INDEX_DIR = DEFAULT_CORPUS_DIR
+
+INDEX_FILE = "law_faiss.index"
+META_FILE = "law_meta.pkl"
+
+MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+EMBED_DIM = 384
+CHUNK_SIZE = 500
+CHUNK_OVERLAP = 50
 
 
+# -------- 工具 --------
+def _read_text(fp: Path) -> str:
+    try:
+        return fp.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return fp.read_text(encoding="gb18030", errors="ignore")
+
+
+def _split_paragraph_chunks(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> Iterable[str]:
+    """先按空行分段，再做长度控制 + overlap。"""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    buf = ""
+    for p in paragraphs:
+        if not buf:
+            buf = p
+            continue
+        if len(buf) + 1 + len(p) <= size:
+            buf = buf + "\n" + p
+        else:
+            # 切块
+            start = 0
+            cur = buf
+            while len(cur) > size:
+                yield cur[:size]
+                start = size - overlap
+                cur = cur[start:]
+            if cur:
+                yield cur
+            buf = p
+    if buf:
+        # 最后一块也按 size/overlap 切一遍
+        cur = buf
+        while len(cur) > size:
+            yield cur[:size]
+            cur = cur[size - overlap :]
+        if cur:
+            yield cur
+
+
+def _norm(v: np.ndarray) -> np.ndarray:
+    n = np.linalg.norm(v, axis=1, keepdims=True) + 1e-12
+    return v / n
+
+
+def _paths(index_dir: Path) -> Tuple[Path, Path]:
+    return index_dir / INDEX_FILE, index_dir / META_FILE
+
+
+# 延迟加载模型，避免模块导入就耗时
+_model = None
+def _get_model():
+    global _model
+    if _model is None:
+        from sentence_transformers import SentenceTransformer
+        _model = SentenceTransformer(MODEL_NAME)
+    return _model
+
+
+# -------- 数据结构 --------
+@dataclass
+class RetrievedChunk:
+    text: str
+    source: str
+    score: float
+
+
+# -------- 类实现（与你现有代码兼容） --------
 class RAGSystem:
-    """RAG 系统，用于法条向量化和检索"""
-    
+    """法条 RAG 系统：构建索引 + 检索。"""
+
     def __init__(self, corpus_dir: str = "legal_corpus", index_dir: str = "storage"):
-        """
-        初始化 RAG 系统
-        
-        Args:
-            corpus_dir: 法条语料库目录
-            index_dir: 索引存储目录
-        """
-        self.corpus_dir = corpus_dir
-        self.index_dir = index_dir
-        self.index_path = os.path.join(index_dir, "law_faiss.index")
-        self.metadata_path = os.path.join(index_dir, "metadata.pkl")
-        
-        # 使用多语言模型
-        self.model = SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
-        
-        # 初始化索引和元数据
-        self.index = None
-        self.metadata = []
-        
-        # 确保目录存在
-        os.makedirs(corpus_dir, exist_ok=True)
-        os.makedirs(index_dir, exist_ok=True)
-    
-    def _split_text_into_chunks(self, text: str, chunk_size: int = 400) -> List[str]:
-        """
-        将文本分割成固定大小的块
-        
-        Args:
-            text: 输入文本
-            chunk_size: 块大小（字符数）
-            
-        Returns:
-            文本块列表
-        """
-        # 按段落分割
-        paragraphs = re.split(r'\n\s*\n', text)
-        chunks = []
-        current_chunk = ""
-        
-        for paragraph in paragraphs:
-            paragraph = paragraph.strip()
-            if not paragraph:
-                continue
-                
-            # 如果当前块加上新段落超过限制，保存当前块
-            if len(current_chunk) + len(paragraph) > chunk_size and current_chunk:
-                chunks.append(current_chunk.strip())
-                current_chunk = paragraph
-            else:
-                current_chunk += "\n" + paragraph if current_chunk else paragraph
-        
-        # 添加最后一个块
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        
-        return chunks
-    
-    def _load_corpus_files(self) -> List[Tuple[str, str]]:
-        """
-        加载语料库文件
-        
-        Returns:
-            (文件名, 文件内容) 的列表
-        """
-        corpus_files = []
-        
-        if not os.path.exists(self.corpus_dir):
-            logger.warning(f"语料库目录不存在: {self.corpus_dir}")
-            return corpus_files
-        
-        for filename in os.listdir(self.corpus_dir):
-            if filename.endswith(('.txt', '.md')):
-                file_path = os.path.join(self.corpus_dir, filename)
+        self.corpus_dir = Path(corpus_dir)
+        self.index_dir = Path(index_dir)
+        self.index_path, self.meta_path = _paths(self.index_dir)
+
+        self.index: faiss.Index | None = None
+        self.metadata: List[Dict] = []
+
+        self.corpus_dir.mkdir(parents=True, exist_ok=True)
+        self.index_dir.mkdir(parents=True, exist_ok=True)
+
+    # ---- 内部 ----
+    def _load_corpus(self) -> List[Tuple[str, str]]:
+        """加载语料库中的 .txt / .md 文件，返回 (文件名, 全文) 列表。"""
+        out: List[Tuple[str, str]] = []
+        if not self.corpus_dir.exists():
+            return out
+
+        # 逐类收集，使用 list 相加，而不是 |
+        files = list(sorted(self.corpus_dir.glob("*.txt")))
+        files += list(sorted(self.corpus_dir.glob("*.md")))
+
+        for f in files:
+            try:
+                text = _read_text(f)
+            except Exception:
+                # 回退：避免个别文件解码失败中断全流程
                 try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    corpus_files.append((filename, content))
-                except Exception as e:
-                    logger.error(f"读取文件失败: {file_path}, 错误: {str(e)}")
-        
-        return corpus_files
-    
+                    text = f.read_text(encoding="gb18030", errors="ignore")
+                except Exception:
+                    continue
+            out.append((f.name, text))
+        return out
+
+
+    # ---- 构建 ----
     def build_index(self) -> bool:
-        """
-        构建法条向量索引
-        
-        Returns:
-            构建是否成功
-        """
         try:
-            # 加载语料库文件
-            corpus_files = self._load_corpus_files()
-            
-            if not corpus_files:
-                logger.warning("没有找到语料库文件")
+            files = self._load_corpus()
+            if not files:
                 return False
-            
-            # 分割文本并准备数据
-            chunks = []
-            metadata = []
-            
-            for filename, content in corpus_files:
-                file_chunks = self._split_text_into_chunks(content)
-                
-                for i, chunk in enumerate(file_chunks):
-                    chunks.append(chunk)
-                    metadata.append({
-                        'source': filename,
-                        'chunk_id': i,
-                        'text': chunk[:100] + "..." if len(chunk) > 100 else chunk
-                    })
-            
-            if not chunks:
-                logger.warning("没有有效的文本块")
+
+            texts: List[str] = []
+            meta: List[Dict] = []
+
+            for fname, content in files:
+                for i, chunk in enumerate(_split_paragraph_chunks(content)):
+                    texts.append(chunk)
+                    # 保存完整 chunk 以便回答引用
+                    meta.append({"source": fname, "chunk_id": i, "text": chunk})
+
+            if not texts:
                 return False
-            
-            # 生成嵌入向量
-            logger.info(f"正在生成 {len(chunks)} 个文本块的嵌入向量...")
-            embeddings = self.model.encode(chunks, show_progress_bar=True)
-            
-            # 创建 FAISS 索引
-            dimension = embeddings.shape[1]
-            self.index = faiss.IndexFlatIP(dimension)  # 使用内积相似度
-            self.index.add(embeddings.astype('float32'))
-            
-            # 保存索引和元数据
-            faiss.write_index(self.index, self.index_path)
-            with open(self.metadata_path, 'wb') as f:
-                pickle.dump(metadata, f)
-            
-            self.metadata = metadata
-            logger.info(f"索引构建完成，共 {len(chunks)} 个文本块")
+
+            model = _get_model()
+            emb = model.encode(texts, convert_to_numpy=True, batch_size=64, show_progress_bar=True).astype("float32")
+            emb = _norm(emb)
+
+            index = faiss.IndexFlatIP(EMBED_DIM)
+            index.add(emb)
+
+            faiss.write_index(index, str(self.index_path))
+            with open(self.meta_path, "wb") as f:
+                pickle.dump(meta, f)
+
+            self.index = index
+            self.metadata = meta
             return True
-            
         except Exception as e:
-            logger.error(f"构建索引失败: {str(e)}")
+            print("[RAG] build_index failed:", e)
             return False
-    
+
+    # ---- 加载 ----
     def load_index(self) -> bool:
-        """
-        加载已存在的索引
-        
-        Returns:
-            加载是否成功
-        """
         try:
-            if not os.path.exists(self.index_path) or not os.path.exists(self.metadata_path):
-                logger.warning("索引文件不存在，需要先构建索引")
+            if not self.index_path.exists() or not self.meta_path.exists():
                 return False
-            
-            # 加载索引
-            self.index = faiss.read_index(self.index_path)
-            
-            # 加载元数据
-            with open(self.metadata_path, 'rb') as f:
+            self.index = faiss.read_index(str(self.index_path))
+            with open(self.meta_path, "rb") as f:
                 self.metadata = pickle.load(f)
-            
-            logger.info(f"索引加载成功，共 {len(self.metadata)} 个文本块")
             return True
-            
         except Exception as e:
-            logger.error(f"加载索引失败: {str(e)}")
+            print("[RAG] load_index failed:", e)
             return False
-    
+
+    # ---- 检索 ----
     def retrieve_law_chunks(self, query: str, top_k: int = 5) -> List[Dict]:
-        """
-        检索相关的法条片段
-        
-        Args:
-            query: 查询文本
-            top_k: 返回的片段数量
-            
-        Returns:
-            相关法条片段列表，每个包含 text 和 source
-        """
         if self.index is None:
-            logger.warning("索引未加载，尝试加载...")
             if not self.load_index():
                 return []
-        
+
         try:
-            # 生成查询向量
-            query_embedding = self.model.encode([query])
-            
-            # 检索相似向量
-            scores, indices = self.index.search(query_embedding.astype('float32'), top_k)
-            
-            # 构建结果
-            results = []
-            for score, idx in zip(scores[0], indices[0]):
-                if idx < len(self.metadata):
-                    metadata = self.metadata[idx]
-                    results.append({
-                        'text': metadata['text'],
-                        'source': metadata['source'],
-                        'score': float(score)
-                    })
-            
+            model = _get_model()
+            q = model.encode([query], convert_to_numpy=True).astype("float32")
+            q = _norm(q)
+            scores, ids = self.index.search(q, top_k)
+            results: List[Dict] = []
+            for s, idx in zip(scores[0], ids[0]):
+                if 0 <= idx < len(self.metadata):
+                    m = self.metadata[idx]
+                    results.append(
+                        {"text": m["text"], "source": m["source"], "score": float(s), "chunk_id": m["chunk_id"]}
+                    )
             return results
-            
         except Exception as e:
-            logger.error(f"检索失败: {str(e)}")
+            print("[RAG] retrieve failed:", e)
             return []
-    
+
     def is_index_available(self) -> bool:
-        """
-        检查索引是否可用
-        
-        Returns:
-            索引是否可用
-        """
-        return (os.path.exists(self.index_path) and 
-                os.path.exists(self.metadata_path) and 
-                self.index is not None)
+        return self.index_path.exists() and self.meta_path.exists()
 
 
-def test_rag_system():
-    """测试 RAG 系统功能"""
-    # 创建测试语料库
-    test_corpus_dir = "test_corpus"
-    os.makedirs(test_corpus_dir, exist_ok=True)
-    
-    # 创建测试文件
-    test_content = """
-    中华人民共和国刑法
-    
-    第一条 为了惩罚犯罪，保护人民，根据宪法，结合我国同犯罪作斗争的具体经验及实际情况，制定本法。
-    
-    第二条 中华人民共和国刑法的任务，是用刑罚同一切犯罪行为作斗争，以保卫国家安全，保卫人民民主专政的政权和社会主义制度，保护国有财产和劳动群众集体所有的财产，保护公民私人所有的财产，保护公民的人身权利、民主权利和其他权利，维护社会秩序、经济秩序，保障社会主义建设事业的顺利进行。
-    """
-    
-    with open(os.path.join(test_corpus_dir, "刑法.txt"), 'w', encoding='utf-8') as f:
-        f.write(test_content)
-    
-    # 测试 RAG 系统
-    rag = RAGSystem(corpus_dir=test_corpus_dir, index_dir="test_index")
-    
-    # 构建索引
-    success = rag.build_index()
-    assert success, "索引构建失败"
-    
-    # 测试检索
-    results = rag.retrieve_law_chunks("犯罪", top_k=2)
-    assert len(results) > 0, "检索结果为空"
-    
-    print("RAG 系统测试通过")
-    
-    # 清理测试文件
-    import shutil
-    shutil.rmtree(test_corpus_dir)
-    shutil.rmtree("test_index")
+# -------- 模块级便捷函数（供脚本/按钮/just 调用） --------
+def build_index(corpus_dir: str | Path = DEFAULT_CORPUS_DIR,
+                 index_dir:  str | Path = DEFAULT_INDEX_DIR) -> None:
+    rag = RAGSystem(str(corpus_dir), str(index_dir))
+    ok = rag.build_index()
+    if not ok:
+        raise RuntimeError("未找到语料或构建失败")
+    print(f"[RAG] 索引构建完成：{rag.index_path}  元数据：{rag.meta_path}")
+
+
+def index_exists(corpus_dir: str | Path = DEFAULT_CORPUS_DIR,
+                 index_dir:  str | Path = DEFAULT_INDEX_DIR) -> bool:
+    idx, meta = _paths(Path(index_dir))
+    return Path(corpus_dir).exists() and idx.exists() and meta.exists()
+
+
+@dataclass
+class SimpleChunk:
+    text: str
+    source: str
+    score: float
+
+
+def retrieve_law_chunks(query: str, top_k: int = 5,
+                        corpus_dir: str | Path = DEFAULT_CORPUS_DIR,
+                        index_dir:  str | Path = DEFAULT_INDEX_DIR) -> List[SimpleChunk]:
+    rag = RAGSystem(str(corpus_dir), str(index_dir))
+    if not rag.load_index():
+        return []
+    items = rag.retrieve_law_chunks(query, top_k=top_k)
+    return [SimpleChunk(text=i["text"], source=i["source"], score=i["score"]) for i in items]
+
+
+def chunks_to_prompt(chunks: List[SimpleChunk]) -> str:
+    lines = []
+    for i, c in enumerate(chunks, 1):
+        lines.append(f"[{i}] 来源: {c.source}  相似度: {c.score:.3f}\n{c.text}\n")
+    return "\n".join(lines)
+
+
+# -------- CLI --------
+def _cli():
+    import argparse, sys, textwrap
+    p = argparse.ArgumentParser(
+        prog="python -m utils.rag_system",
+        formatter_class=argparse.RawTextHelpFormatter,
+        description=textwrap.dedent("""\
+        法条 RAG 工具：
+          build                         构建索引
+          query  '问题'  --topk 5       检索法条段落
+        """),
+    )
+    p.add_argument("cmd", choices=["build", "query"])
+    p.add_argument("--corpus", default=str(DEFAULT_CORPUS_DIR))
+    p.add_argument("--index", default=str(DEFAULT_INDEX_DIR))
+    p.add_argument("--topk", type=int, default=5)
+    p.add_argument("rest", nargs="*")
+    args = p.parse_args()
+
+    if args.cmd == "build":
+        build_index(args.corpus, args.index)
+        return
+
+    if args.cmd == "query":
+        if not args.rest:
+            print("请提供查询内容，如：python -m utils.rag_system query 合同解除的条件")
+            sys.exit(1)
+        q = " ".join(args.rest)
+        chunks = retrieve_law_chunks(q, top_k=args.topk, corpus_dir=args.corpus, index_dir=args.index)
+        print(chunks_to_prompt(chunks))
+        return
 
 
 if __name__ == "__main__":
-    test_rag_system() 
+    _cli()

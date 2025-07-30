@@ -32,35 +32,202 @@ st.set_page_config(
 # 自定义 CSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
+    /* 全局样式 */
+    .main-container {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        min-height: 100vh;
+        padding: 20px;
+    }
+    .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(52, 152, 219, 0.1);
+        transition: all 0.3s ease;
+    }
+    .card-header {
+        font-size: 1.5rem;
         font-weight: bold;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
+        color: #2c3e50;
+        margin-bottom: 20px;
+        border-bottom: 3px solid #3498db;
+        padding-bottom: 12px;
+        position: relative;
+    }
+    .card-header::after {
+        content: '';
+        position: absolute;
+        bottom: -3px;
+        left: 0;
+        width: 60px;
+        height: 3px;
+        background: #3498db;
+        border-radius: 2px;
     }
     .case-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        border-left: 4px solid #1f77b4;
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #3498db;
+        transition: all 0.3s ease;
+    }
+    .case-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
     }
     .dialog-box {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #e74c3c;
     }
     .citation-box {
-        background-color: #e8f4fd;
-        padding: 0.5rem;
-        border-radius: 0.3rem;
-        margin-top: 0.5rem;
-        border-left: 3px solid #1f77b4;
+        background: #ecf0f1;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #3498db;
+    }
+    .metric-container {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .metric-container:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-bottom: 4px;
+    }
+    .metric-label {
+        font-size: 0.9rem;
+        color: #7f8c8d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    .status-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    .status-success {
+        background: #27ae60;
+        box-shadow: 0 0 8px rgba(39, 174, 96, 0.3);
+    }
+    .status-warning {
+        background: #f39c12;
+        box-shadow: 0 0 8px rgba(243, 156, 18, 0.3);
+    }
+    .status-error {
+        background: #e74c3c;
+        box-shadow: 0 0 8px rgba(231, 76, 60, 0.3);
     }
     .stButton > button {
-        width: 100%;
+        background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(52, 152, 219, 0.4);
+    }
+    .stSidebar {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-right: 1px solid rgba(52, 152, 219, 0.1);
+    }
+    .stTextInput > div > div > input {
+        border-radius: 8px;
+        border: 2px solid rgba(52, 152, 219, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .stTextInput > div > div > input:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+    .stFileUploader > div {
+        border-radius: 12px;
+        border: 2px dashed rgba(52, 152, 219, 0.3);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    .stFileUploader > div:hover {
+        border-color: #3498db;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+    }
+    .stTextArea > div > div > textarea {
+        border-radius: 8px;
+        border: 2px solid rgba(52, 152, 219, 0.1);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .stTextArea > div > div > textarea:focus {
+        border-color: #3498db;
+        box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    }
+    .stDivider {
+        margin: 24px 0;
+    }
+    .stAlert {
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+    .file-button {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px 12px;
+        margin: 2px 0;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+    .file-button:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+    .file-button.selected {
+        background: #d1ecf1;
+        border-color: #17a2b8;
+        color: #0c5460;
+    }
+    .law-button {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px 12px;
+        margin: 2px 0;
+        font-size: 0.85rem;
+        transition: all 0.2s ease;
+    }
+    .law-button:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+    .law-button.selected {
+        background: #d4edda;
+        border-color: #28a745;
+        color: #155724;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -106,18 +273,18 @@ def initialize_components():
 
 def render_header():
     """渲染页面头部"""
-    st.markdown('<h1 class="main-header">⚖️ Legal Analyzer</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">Legal Analyzer</h1>', unsafe_allow_html=True)
     st.markdown('<p style="text-align: center; font-size: 1.2rem; color: #666;">法律案例分析工具</p>', unsafe_allow_html=True)
 
 
 def render_sidebar():
     """渲染侧边栏"""
-    st.sidebar.title("📁 案例管理")
+    st.sidebar.title("案例管理")
     
     # 新建案例
     st.sidebar.subheader("新建案例")
     new_case_title = st.sidebar.text_input("案例标题", placeholder="请输入案例标题")
-    if st.sidebar.button("➕ 创建新案例", type="primary"):
+    if st.sidebar.button("创建新案例", type="primary"):
         if new_case_title.strip():
             try:
                 case_meta = st.session_state.case_manager.create_case(new_case_title.strip())
@@ -145,13 +312,13 @@ def render_sidebar():
             
             # 创建案例卡片
             with st.sidebar.container():
-                col1, col2 = st.columns([3, 1])
+                col1, col2 = st.columns([4, 1])
                 with col1:
-                    if st.button(f"📄 {title}", key=f"case_{case_id}"):
+                    if st.button(f"{title}", key=f"case_{case_id}"):
                         st.session_state.selected_case_id = case_id
                         st.rerun()
                 with col2:
-                    if st.button("🗑️", key=f"delete_{case_id}"):
+                    if st.button("删除", key=f"delete_{case_id}", help="删除案例"):
                         if st.session_state.case_manager.delete_case(case_id):
                             st.success("案例删除成功")
                             if st.session_state.selected_case_id == case_id:
@@ -160,19 +327,130 @@ def render_sidebar():
                         else:
                             st.error("删除失败")
                 
-                st.caption(f"📅 {created_at} | 📎 {file_count} 个文件")
+                st.caption(f"{created_at} | {file_count} 个文件")
     
     st.sidebar.divider()
     
+    # 法律条文管理
+    st.sidebar.subheader("法律条文管理")
+    
+    # 初始化选中状态
+    if 'selected_laws' not in st.session_state:
+        st.session_state.selected_laws = []
+    if 'show_delete_confirm' not in st.session_state:
+        st.session_state.show_delete_confirm = None
+    
+    # 显示当前法律条文文件
+    law_files = []
+    if os.path.exists("legal_corpus"):
+        law_files = [f for f in os.listdir("legal_corpus") if f.endswith(('.txt', '.md', '.pdf', '.docx'))]
+    
+    if law_files:
+        st.sidebar.write(f"当前有 {len(law_files)} 个法律条文文件")
+        
+        # 显示法律条文按钮
+        for i, filename in enumerate(law_files):
+            is_selected = filename in st.session_state.selected_laws
+            
+            col1, col2 = st.sidebar.columns([3, 1])
+            with col1:
+                button_style = "primary" if is_selected else "secondary"
+                if st.button(f"{filename}", key=f"law_{i}", type=button_style):
+                    if filename not in st.session_state.selected_laws:
+                        st.session_state.selected_laws.append(filename)
+                    else:
+                        st.session_state.selected_laws.remove(filename)
+                    st.rerun()
+            with col2:
+                if st.button("删除", key=f"delete_law_{i}", help="删除此条文"):
+                    st.session_state.show_delete_confirm = filename
+                    st.rerun()
+        
+        # 删除确认弹窗
+        if st.session_state.show_delete_confirm:
+            filename = st.session_state.show_delete_confirm
+            st.sidebar.warning(f"确认删除法律条文：{filename}")
+            col1, col2 = st.sidebar.columns(2)
+            with col1:
+                if st.button("确认删除", key="confirm_delete", type="primary"):
+                    try:
+                        law_file_path = os.path.join("legal_corpus", filename)
+                        os.remove(law_file_path)
+                        # 从选中列表中移除
+                        if filename in st.session_state.selected_laws:
+                            st.session_state.selected_laws.remove(filename)
+                        st.sidebar.success(f"删除成功: {filename}")
+                        st.session_state.show_delete_confirm = None
+                        st.rerun()
+                    except Exception as e:
+                        st.sidebar.error(f"删除失败: {filename}")
+            with col2:
+                if st.button("取消", key="cancel_delete"):
+                    st.session_state.show_delete_confirm = None
+                    st.rerun()
+    else:
+        st.sidebar.info("暂无法律条文文件")
+    
+    # 上传法律条文（集成在已上传条文模块内）
+    st.sidebar.markdown("**上传新条文：**")
+    uploaded_laws = st.sidebar.file_uploader(
+        "选择法律条文文件",
+        type=['txt', 'md', 'pdf', 'docx'],
+        accept_multiple_files=True,
+        key="upload_laws"
+    )
+    
+    if uploaded_laws:
+        st.sidebar.write(f"已选择 {len(uploaded_laws)} 个法律条文文件")
+        if st.sidebar.button("保存法律条文", key="save_laws"):
+            with st.spinner("正在保存法律条文..."):
+                success_count = 0
+                for uploaded_file in uploaded_laws:
+                    try:
+                        # 确保目录存在
+                        os.makedirs("legal_corpus", exist_ok=True)
+                        # 保存到法律条文目录
+                        law_file_path = os.path.join("legal_corpus", uploaded_file.name)
+                        with open(law_file_path, "wb") as f:
+                            f.write(uploaded_file.getbuffer())
+                        success_count += 1
+                    except Exception as e:
+                        st.sidebar.error(f"保存失败: {uploaded_file.name}")
+                
+                if success_count > 0:
+                    st.sidebar.success(f"成功保存 {success_count} 个法律条文文件")
+                    st.rerun()
+    
+    # 显示选中的法律条文（在上传模块之后）
+    st.sidebar.markdown("**已选中的条文：**")
+    if st.session_state.selected_laws:
+        for i, filename in enumerate(st.session_state.selected_laws):
+            col1, col2 = st.sidebar.columns([3, 1])
+            with col1:
+                st.markdown(f"""
+                <div style="padding: 4px 8px; margin: 2px 0; background: rgba(52, 152, 219, 0.2); border-radius: 4px; font-size: 0.8rem; border-left: 3px solid #3498db;">
+                    {filename}
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                if st.button("移除", key=f"remove_law_{i}", help="从选中列表中移除"):
+                    st.session_state.selected_laws.remove(filename)
+                    st.rerun()
+    else:
+        st.sidebar.markdown("""
+        <div style="padding: 8px 12px; margin: 4px 0; background: rgba(248, 249, 250, 0.8); border-radius: 4px; font-size: 0.8rem; border: 1px dashed #dee2e6; color: #6c757d; text-align: center;">
+            请选择条文构建向量库
+        </div>
+        """, unsafe_allow_html=True)
+    
     # 重建法条向量库
-    st.sidebar.subheader("🔧 系统设置")
-    if st.sidebar.button("🔨 重建法条向量库"):
+    if st.sidebar.button("重建法条向量库", type="primary"):
         with st.spinner("正在重建法条向量库..."):
             try:
                 if st.session_state.rag_system.build_index():
                     st.success("法条向量库重建成功！")
                 else:
-                    st.error("法条向量库重建失败")
+                    st.error("法条向量库重建失败，请确保已上传法律条文文件")
             except Exception as e:
                 st.error(f"重建失败: {str(e)}")
 
@@ -188,13 +466,13 @@ def render_main_content():
 def render_welcome_page():
     """渲染欢迎页面"""
     st.markdown("""
-    ## 🎯 欢迎使用 Legal Analyzer
+    ## 欢迎使用 Legal Analyzer
     
     ### 主要功能
-    - **📁 案例管理**: 创建和管理法律案例
-    - **📄 文档解析**: 支持 PDF 和 Word 文档自动解析
-    - **🤖 智能问答**: 基于案例内容和相关法条的 AI 问答
-    - **📚 法条检索**: 本地 RAG 向量库，快速检索相关法律条文
+    - **案例管理**: 创建和管理法律案例
+    - **文档解析**: 支持 PDF 和 Word 文档自动解析
+    - **智能问答**: 基于案例内容和相关法条的 AI 问答
+    - **法条检索**: 本地 RAG 向量库，快速检索相关法律条文
     
     ### 使用步骤
     1. **创建案例**: 在左侧输入案例标题并创建
@@ -208,15 +486,39 @@ def render_welcome_page():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("案例数量", len(st.session_state.case_manager.get_all_cases()))
+        case_count = len(st.session_state.case_manager.get_all_cases())
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-value">{case_count}</div>
+            <div class="metric-label">案例数量</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        rag_status = "✅ 已构建" if st.session_state.rag_system.is_index_available() else "❌ 未构建"
-        st.metric("法条向量库", rag_status)
+        rag_available = st.session_state.rag_system.is_index_available()
+        rag_status = "已构建" if rag_available else "未构建"
+        rag_class = "status-success" if rag_available else "status-warning"
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-value">
+                <span class="status-indicator {rag_class}"></span>{rag_status}
+            </div>
+            <div class="metric-label">法条向量库</div>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col3:
-        ai_status = "✅ 已连接" if st.session_state.ai_client else "❌ 未连接"
-        st.metric("AI 服务", ai_status)
+        ai_available = st.session_state.ai_client is not None
+        ai_status = "已连接" if ai_available else "未连接"
+        ai_class = "status-success" if ai_available else "status-error"
+        st.markdown(f"""
+        <div class="metric-container">
+            <div class="metric-value">
+                <span class="status-indicator {ai_class}"></span>{ai_status}
+            </div>
+            <div class="metric-label">AI 服务</div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 def render_case_page():
@@ -228,70 +530,194 @@ def render_case_page():
         st.error("案例不存在")
         return
     
-    # 页面标题
-    st.title(f"📄 {case_meta['title']}")
+    # 案例标题 - 单独列出
+    st.markdown(f"""
+    <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header" style="font-size: 1.8rem; text-align: center; border-bottom: none;">
+            {case_meta['title']}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # 案例信息
-    col1, col2, col3, col4 = st.columns(4)
+    # 案例信息 - 简化显示
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("文件数量", len(case_meta['file_list']))
+        st.markdown(f"""
+        <div class="metric-container" style="padding: 12px;">
+            <div class="metric-value" style="font-size: 1.5rem;">{len(case_meta['file_list'])}</div>
+            <div class="metric-label">文件数量</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col2:
-        st.metric("文本字数", case_meta['total_chars'])
+        st.markdown(f"""
+        <div class="metric-container" style="padding: 12px;">
+            <div class="metric-value" style="font-size: 1.5rem;">{case_meta['total_chars']}</div>
+            <div class="metric-label">文本字数</div>
+        </div>
+        """, unsafe_allow_html=True)
     with col3:
-        created_at = datetime.fromisoformat(case_meta['created_at']).strftime("%Y-%m-%d")
-        st.metric("创建时间", created_at)
-    with col4:
         updated_at = datetime.fromisoformat(case_meta['updated_at']).strftime("%Y-%m-%d")
-        st.metric("更新时间", updated_at)
+        st.markdown(f"""
+        <div class="metric-container" style="padding: 12px;">
+            <div class="metric-value" style="font-size: 1.5rem;">{updated_at}</div>
+            <div class="metric-label">更新时间</div>
+        </div>
+        """, unsafe_allow_html=True)
     
-    # 主要内容区域
-    col1, col2 = st.columns([1, 2])
+    # 文件管理模块 - 缩小并列
+    col1, col2 = st.columns(2)
     
     with col1:
+        st.markdown("""
+        <div class="card" style="padding: 16px; margin-bottom: 16px;">
+            <div class="card-header" style="font-size: 1.2rem; margin-bottom: 12px;">文件上传</div>
+        """, unsafe_allow_html=True)
         render_file_upload_section(case_id)
-        render_file_list_section(case_meta)
+        st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
-        render_qa_section(case_id)
+        st.markdown("""
+        <div class="card" style="padding: 16px; margin-bottom: 16px;">
+            <div class="card-header" style="font-size: 1.2rem; margin-bottom: 12px;">文件列表</div>
+        """, unsafe_allow_html=True)
+        render_file_list_section(case_meta)
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # AI问答模块 - 加大模块化
+    st.markdown("""
+    <div class="card" style="margin-bottom: 16px;">
+        <div class="card-header" style="font-size: 1.4rem;">智能问答</div>
+    """, unsafe_allow_html=True)
+    render_qa_section(case_id)
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # 历史记录 - 无感展示在底部
+    render_dialog_history_simple(case_id)
 
 
 def render_file_upload_section(case_id):
     """渲染文件上传区域"""
-    st.subheader("📤 上传文件")
-    
+    st.markdown("**文件上传**")
     uploaded_files = st.file_uploader(
-        "选择 PDF 或 Word 文档",
-        type=['pdf', 'docx', 'doc'],
+        "选择文档文件",
+        type=['pdf', 'docx', 'doc', 'txt', 'md'],
         accept_multiple_files=True,
         key=f"upload_{case_id}"
     )
     
     if uploaded_files:
+        st.write(f"已选择 {len(uploaded_files)} 个文件")
         for uploaded_file in uploaded_files:
-            if st.button(f"上传 {uploaded_file.name}", key=f"upload_btn_{uploaded_file.name}"):
-                with st.spinner(f"正在处理 {uploaded_file.name}..."):
+            st.markdown(f"""
+            <div style="padding: 6px 8px; margin-bottom: 4px; background: rgba(52, 152, 219, 0.1); border-radius: 4px; font-size: 0.8rem;">
+                {uploaded_file.name}
+            </div>
+            """, unsafe_allow_html=True)
+        
+        if st.button("解析并上传所有文件", key=f"upload_all_{case_id}"):
+            with st.spinner("正在处理文件..."):
+                success_count = 0
+                for uploaded_file in uploaded_files:
                     if st.session_state.case_manager.upload_file_to_case(case_id, uploaded_file):
-                        st.success(f"文件 {uploaded_file.name} 上传成功！")
-                        st.rerun()
-                    else:
-                        st.error(f"文件 {uploaded_file.name} 上传失败")
+                        success_count += 1
+                
+                if success_count > 0:
+                    st.success(f"成功上传 {success_count} 个文件")
+                    st.rerun()
+                else:
+                    st.error("文件上传失败")
 
 
 def render_file_list_section(case_meta):
     """渲染文件列表区域"""
-    st.subheader("📎 文件列表")
-    
+    st.markdown("**文件列表**")
     if not case_meta['file_list']:
         st.info("暂无文件")
     else:
-        for i, filename in enumerate(case_meta['file_list']):
-            st.write(f"{i+1}. {filename}")
+        # 获取当前案例ID
+        case_id = st.session_state.selected_case_id
+        
+        # 初始化选中的文件列表
+        if f'selected_files_{case_id}' not in st.session_state:
+            st.session_state[f'selected_files_{case_id}'] = []
+        
+        # 初始化删除确认状态
+        if f'show_delete_confirm_{case_id}' not in st.session_state:
+            st.session_state[f'show_delete_confirm_{case_id}'] = None
+        
+        # 显示文件按钮
+        for i, file_info in enumerate(case_meta['file_list']):
+            if isinstance(file_info, dict):
+                filename = file_info.get('filename', '未知文件')
+                chars = file_info.get('chars', 0)
+            else:
+                filename = str(file_info)
+                chars = 0
+            
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                # 根据是否被选中显示不同样式
+                is_selected = filename in st.session_state[f'selected_files_{case_id}']
+                button_style = "primary" if is_selected else "secondary"
+                
+                if st.button(f"{filename} ({chars} 字符)", key=f"file_{case_id}_{i}", type=button_style):
+                    if filename in st.session_state[f'selected_files_{case_id}']:
+                        st.session_state[f'selected_files_{case_id}'].remove(filename)
+                    else:
+                        st.session_state[f'selected_files_{case_id}'].append(filename)
+                    st.rerun()
+            
+            with col2:
+                if st.button("删除", key=f"delete_file_{case_id}_{i}", help="删除此文件"):
+                    st.session_state[f'show_delete_confirm_{case_id}'] = filename
+                    st.rerun()
+        
+        # 删除确认弹窗
+        if st.session_state[f'show_delete_confirm_{case_id}']:
+            filename = st.session_state[f'show_delete_confirm_{case_id}']
+            st.warning(f"确认删除文件：{filename}")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("确认删除", key=f"confirm_delete_file_{case_id}", type="primary"):
+                    if st.session_state.case_manager.delete_file_from_case(case_id, filename):
+                        # 从选中列表中移除
+                        if filename in st.session_state[f'selected_files_{case_id}']:
+                            st.session_state[f'selected_files_{case_id}'].remove(filename)
+                        st.success(f"删除成功: {filename}")
+                        st.session_state[f'show_delete_confirm_{case_id}'] = None
+                        st.rerun()
+                    else:
+                        st.error(f"删除失败: {filename}")
+            with col2:
+                if st.button("取消", key=f"cancel_delete_file_{case_id}"):
+                    st.session_state[f'show_delete_confirm_{case_id}'] = None
+                    st.rerun()
+        
+        # 显示选中的文件
+        st.markdown("**已选中的文件：**")
+        if st.session_state[f'selected_files_{case_id}']:
+            for i, filename in enumerate(st.session_state[f'selected_files_{case_id}']):
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"""
+                    <div style="padding: 4px 8px; margin: 2px 0; background: rgba(39, 174, 96, 0.2); border-radius: 4px; font-size: 0.8rem; border-left: 3px solid #27ae60;">
+                        {filename}
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col2:
+                    if st.button("移除", key=f"remove_file_{case_id}_{i}", help="从选中列表中移除"):
+                        st.session_state[f'selected_files_{case_id}'].remove(filename)
+                        st.rerun()
+        else:
+            st.markdown("""
+            <div style="padding: 8px 12px; margin: 4px 0; background: rgba(248, 249, 250, 0.8); border-radius: 4px; font-size: 0.8rem; border: 1px dashed #dee2e6; color: #6c757d; text-align: center;">
+                请选择文件用于AI对话
+            </div>
+            """, unsafe_allow_html=True)
 
 
 def render_qa_section(case_id):
     """渲染问答区域"""
-    st.subheader("🤖 智能问答")
-    
     # 检查 AI 客户端
     if st.session_state.ai_client is None:
         st.error("AI 服务未连接，请检查 API 配置")
@@ -301,22 +727,35 @@ def render_qa_section(case_id):
     if not st.session_state.rag_system.is_index_available():
         st.warning("法条向量库未构建，问答功能可能受限")
     
-    # 问题输入
+    # 问题输入区域
     user_question = st.text_area(
         "请输入您的问题：",
-        placeholder="例如：这个案例的判决依据是什么？",
-        height=100,
+        placeholder="例如：这个案例的判决依据是什么？这个案例涉及哪些法律条文？",
+        height=150,
         key=f"question_{case_id}"
     )
     
-    if st.button("🔍 提交问题", type="primary", key=f"submit_{case_id}"):
-        if user_question.strip():
-            process_question(case_id, user_question.strip())
-        else:
-            st.warning("请输入问题")
+    # 按钮区域
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        if st.button("提交问题", type="primary", key=f"submit_{case_id}"):
+            if user_question.strip():
+                process_question(case_id, user_question.strip())
+            else:
+                st.warning("请输入问题")
     
-    # 显示对话历史
-    render_dialog_history(case_id)
+    with col2:
+        if st.button("清空问题", key=f"clear_{case_id}"):
+            st.rerun()
+    
+    with col3:
+        if st.button("查看历史", key=f"view_history_{case_id}"):
+            st.session_state.show_full_history = not st.session_state.get('show_full_history', False)
+            st.rerun()
+    
+    # 显示完整历史记录（如果用户点击了查看历史）
+    if st.session_state.get('show_full_history', False):
+        render_dialog_history(case_id)
 
 
 def process_question(case_id, question):
@@ -327,6 +766,15 @@ def process_question(case_id, question):
         
         if not case_text.strip():
             st.error("案例中没有文本内容，请先上传文件")
+            # 显示调试信息
+            case_meta = st.session_state.case_manager.get_case_meta(case_id)
+            if case_meta and case_meta.get('file_list'):
+                st.info(f"已上传 {len(case_meta['file_list'])} 个文件，但文本提取可能失败")
+                for i, file_info in enumerate(case_meta['file_list']):
+                    if isinstance(file_info, dict):
+                        filename = file_info.get('filename', '未知文件')
+                        chars = file_info.get('chars', 0)
+                        st.write(f"文件 {i+1}: {filename} (提取字符数: {chars})")
             return
         
         # 检索相关法条
@@ -347,7 +795,25 @@ def process_question(case_id, question):
         
         # 显示回答
         st.success("回答生成完成！")
-        st.rerun()
+        
+        # 显示问题和回答
+        st.markdown("### 最新对话")
+        st.markdown("**问题：**")
+        st.markdown(f"<div class='dialog-box'>{question}</div>", unsafe_allow_html=True)
+        
+        st.markdown("**回答：**")
+        st.markdown(f"<div class='dialog-box'>{result['answer']}</div>", unsafe_allow_html=True)
+        
+        # 显示引用依据
+        if result['citations']:
+            st.markdown("**引用依据：**")
+            for citation in result['citations']:
+                st.markdown(f"""
+                <div class='citation-box'>
+                    <strong>来源：</strong>{citation['source']}<br>
+                    <strong>内容：</strong>{citation['text']}
+                </div>
+                """, unsafe_allow_html=True)
         
     except Exception as e:
         st.error(f"处理问题失败: {str(e)}")
@@ -355,7 +821,7 @@ def process_question(case_id, question):
 
 def render_dialog_history(case_id):
     """渲染对话历史"""
-    st.subheader("💬 对话历史")
+    st.subheader("对话历史")
     
     dialog_history = st.session_state.case_manager.get_dialog_history(case_id)
     
@@ -370,19 +836,19 @@ def render_dialog_history(case_id):
             
             # 时间戳
             timestamp = datetime.fromisoformat(dialog['timestamp']).strftime("%Y-%m-%d %H:%M:%S")
-            st.caption(f"📅 {timestamp}")
+            st.caption(f"{timestamp}")
             
             # 问题
-            st.markdown("**❓ 问题：**")
+            st.markdown("**问题：**")
             st.markdown(f"<div class='dialog-box'>{dialog['question']}</div>", unsafe_allow_html=True)
             
             # 回答
-            st.markdown("**🤖 回答：**")
+            st.markdown("**回答：**")
             st.markdown(f"<div class='dialog-box'>{dialog['answer']}</div>", unsafe_allow_html=True)
             
             # 引用依据
             if dialog['citations']:
-                st.markdown("**📚 引用依据：**")
+                st.markdown("**引用依据：**")
                 for citation in dialog['citations']:
                     st.markdown(f"""
                     <div class='citation-box'>
@@ -390,6 +856,37 @@ def render_dialog_history(case_id):
                         <strong>内容：</strong>{citation['text']}
                     </div>
                     """, unsafe_allow_html=True)
+
+
+def render_dialog_history_simple(case_id):
+    """渲染简化的对话历史 - 无感展示"""
+    dialog_history = st.session_state.case_manager.get_dialog_history(case_id)
+    
+    if not dialog_history:
+        return
+    
+    # 只显示最新的3条对话
+    recent_dialogs = dialog_history[-3:]
+    
+    st.markdown("""
+    <div style="margin-top: 20px; padding: 16px; background: rgba(248, 249, 250, 0.5); border-radius: 8px; border-left: 3px solid #3498db;">
+        <div style="font-size: 0.9rem; color: #7f8c8d; margin-bottom: 12px;">最近对话</div>
+    """, unsafe_allow_html=True)
+    
+    for dialog in reversed(recent_dialogs):
+        timestamp = datetime.fromisoformat(dialog['timestamp']).strftime("%m-%d %H:%M")
+        question = dialog['question'][:40] + '...' if len(dialog['question']) > 40 else dialog['question']
+        answer = dialog['answer'][:60] + '...' if len(dialog['answer']) > 60 else dialog['answer']
+        
+        st.markdown(f"""
+        <div style="margin-bottom: 12px; padding: 8px; background: rgba(255, 255, 255, 0.7); border-radius: 6px; font-size: 0.85rem;">
+            <div style="color: #7f8c8d; font-size: 0.75rem;">{timestamp}</div>
+            <div style="font-weight: 500; margin: 4px 0; color: #2c3e50;">问：{question}</div>
+            <div style="margin: 4px 0; color: #7f8c8d; font-size: 0.8rem;">答：{answer}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def main():

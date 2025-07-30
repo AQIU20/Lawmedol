@@ -3,15 +3,72 @@
 用于管理案例的创建、存储和检索
 """
 
+from __future__ import annotations
 import os
 import json
 import shutil
+import re
 from datetime import datetime
 from typing import List, Dict, Optional
+from pathlib import Path
+from io import BytesIO, BufferedReader
 import logging
+
 from .file_processor import FileProcessor
 
 logger = logging.getLogger(__name__)
+
+# -----------------------------
+# 上传健壮性工具
+# -----------------------------
+
+_ILLEGAL = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+def _safe_filename(name: str) -> str:
+    """清洗文件名，避免非法字符/路径注入"""
+    name = (name or "file").strip()
+    name = _ILLEGAL.sub("_", name)
+    return name or "file"
+
+def _write_uploaded(target: Path, uploaded_file) -> int:
+    """
+    将上传内容写入到 target。
+    兼容多种 Streamlit / file-like 对象：
+    - 有 getbuffer()：直接写入
+    - 有 read()：分块写入
+    - bytes / bytearray：直接写
+    返回写入字节数（<=0 表示失败）
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    size = 0
+
+    # bytes / bytearray
+    if isinstance(uploaded_file, (bytes, bytearray)):
+        with open(target, "wb") as f:
+            f.write(uploaded_file)
+        return len(uploaded_file)
+
+    # Streamlit UploadedFile 常见：getbuffer()
+    try:
+        buf = uploaded_file.getbuffer()
+        with open(target, "wb") as f:
+            f.write(buf)
+        return len(buf)
+    except Exception:
+        pass
+
+    # 退回到 read() 流式写入
+    try:
+        with open(target, "wb") as f:
+            while True:
+                chunk = uploaded_file.read(8192)
+                if not chunk:
+                    break
+                f.write(chunk)
+                size += len(chunk)
+        return size
+    except Exception:
+        return 0
 
 
 class CaseManager:
@@ -149,7 +206,7 @@ class CaseManager:
         
         Args:
             case_id: 案例 ID
-            uploaded_file: Streamlit 上传的文件对象
+            uploaded_file: Streamlit 上传的文件对象 / file-like / bytes
             
         Returns:
             上传是否成功
@@ -160,55 +217,70 @@ class CaseManager:
                 logger.error(f"案例不存在: {case_id}")
                 return False
             
-            # 保存原始文件
+            # 保存原始文件目录
             files_dir = os.path.join(case_dir, "files")
-            file_path = os.path.join(files_dir, uploaded_file.name)
-            
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            
-            # 提取文本
-            file_processor = FileProcessor()
-            extracted_text = file_processor.extract_text_from_file(file_path)
-            
-            if extracted_text is None:
-                logger.error(f"文件文本提取失败: {uploaded_file.name}")
+            os.makedirs(files_dir, exist_ok=True)
+
+            # 安全文件名 + 去重
+            raw_name = getattr(uploaded_file, "name", "file")
+            safe_name = _safe_filename(raw_name)
+            base, ext = os.path.splitext(safe_name)
+            target = Path(files_dir) / safe_name
+            n = 1
+            while target.exists():
+                target = Path(files_dir) / f"{base}({n}){ext}"
+                n += 1
+
+            # 写入文件（兼容多种上传对象）
+            bytes_written = _write_uploaded(target, uploaded_file)
+            if bytes_written <= 0:
+                logger.error(f"写入上传文件失败: {safe_name}")
                 return False
             
+            # 提取文本
+            extracted_text = ""
+            try:
+                file_processor = FileProcessor()
+                extracted_text = file_processor.extract_text_from_file(str(target)) or ""
+                logger.info(f"文本提取结果: {target.name} -> {len(extracted_text)} 字符")
+            except Exception as e:
+                logger.error(f"文件文本提取失败: {target.name} -> {e}")
+                extracted_text = ""
+
             # 追加到案例文本
             current_text = self.get_case_text(case_id)
-            new_text = current_text + "\n\n" + extracted_text if current_text else extracted_text
-            
-            # 更新案例文本
-            self._save_case_text(case_id, new_text)
-            
+            if extracted_text:
+                new_text = current_text + "\n\n" + extracted_text if current_text else extracted_text
+                self._save_case_text(case_id, new_text)
+                total_chars = len(new_text)
+            else:
+                total_chars = len(current_text)
+
             # 更新元数据
-            case_meta = self.get_case_meta(case_id)
-            if case_meta:
-                case_meta['file_list'].append(uploaded_file.name)
-                case_meta['total_chars'] = len(new_text)
-                case_meta['updated_at'] = datetime.now().isoformat()
-                self._save_case_meta(case_id, case_meta)
+            case_meta = self.get_case_meta(case_id) or {}
+            file_list = case_meta.get('file_list', [])
+            file_list.append({
+                'filename': target.name,
+                'path': str(target),
+                'size': bytes_written,
+                'added_at': datetime.now().isoformat(),
+                'chars': len(extracted_text),
+            })
+            case_meta['file_list'] = file_list
+            case_meta['total_chars'] = total_chars
+            case_meta['updated_at'] = datetime.now().isoformat()
+            self._save_case_meta(case_id, case_meta)
             
-            logger.info(f"文件上传成功: {uploaded_file.name} -> case_{case_id}")
+            logger.info(f"文件上传成功: {target.name} ({bytes_written} bytes) -> case_{case_id}")
             return True
             
         except Exception as e:
-            logger.error(f"文件上传失败: {str(e)}")
+            logger.exception(f"文件上传失败: {str(e)}")
             return False
     
     def add_dialog(self, case_id: str, question: str, answer: str, citations: List[Dict] = None) -> bool:
         """
         添加对话记录
-        
-        Args:
-            case_id: 案例 ID
-            question: 用户问题
-            answer: AI 回答
-            citations: 引用依据
-            
-        Returns:
-            添加是否成功
         """
         try:
             dialog_log = self._load_dialog_log(case_id)
@@ -231,26 +303,12 @@ class CaseManager:
             return False
     
     def get_dialog_history(self, case_id: str) -> List[Dict]:
-        """
-        获取对话历史
-        
-        Args:
-            case_id: 案例 ID
-            
-        Returns:
-            对话历史列表
-        """
+        """获取对话历史"""
         return self._load_dialog_log(case_id)
     
     def delete_case(self, case_id: str) -> bool:
         """
         删除案例
-        
-        Args:
-            case_id: 案例 ID
-            
-        Returns:
-            删除是否成功
         """
         try:
             case_dir = os.path.join(self.cases_dir, f"case_{case_id}")
@@ -266,13 +324,70 @@ class CaseManager:
             logger.error(f"删除案例失败: {str(e)}")
             return False
     
-    def _generate_case_id(self) -> str:
+    def delete_file_from_case(self, case_id: str, filename: str) -> bool:
         """
-        生成唯一的案例 ID
+        从案例中删除指定文件
         
+        Args:
+            case_id: 案例 ID
+            filename: 文件名
+            
         Returns:
-            案例 ID
+            删除是否成功
         """
+        try:
+            case_dir = os.path.join(self.cases_dir, f"case_{case_id}")
+            if not os.path.exists(case_dir):
+                logger.error(f"案例不存在: {case_id}")
+                return False
+            
+            # 找到要删除的文件
+            files_dir = os.path.join(case_dir, "files")
+            file_path = os.path.join(files_dir, filename)
+            
+            if not os.path.exists(file_path):
+                logger.error(f"文件不存在: {filename}")
+                return False
+            
+            # 删除文件
+            os.remove(file_path)
+            
+            # 重新构建案例文本（排除已删除的文件）
+            case_meta = self.get_case_meta(case_id)
+            if case_meta:
+                file_list = case_meta.get('file_list', [])
+                # 移除被删除的文件
+                file_list = [f for f in file_list if f.get('filename') != filename]
+                case_meta['file_list'] = file_list
+                
+                # 重新构建文本内容
+                new_text = ""
+                for file_info in file_list:
+                    file_path = file_info.get('path')
+                    if file_path and os.path.exists(file_path):
+                        try:
+                            file_processor = FileProcessor()
+                            extracted_text = file_processor.extract_text_from_file(file_path) or ""
+                            if extracted_text:
+                                new_text += "\n\n" + extracted_text if new_text else extracted_text
+                        except Exception as e:
+                            logger.warning(f"重新提取文件文本失败: {file_path} -> {e}")
+                
+                # 更新案例文本和元数据
+                self._save_case_text(case_id, new_text)
+                case_meta['total_chars'] = len(new_text)
+                case_meta['updated_at'] = datetime.now().isoformat()
+                self._save_case_meta(case_id, case_meta)
+            
+            logger.info(f"文件删除成功: {filename} -> case_{case_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"删除文件失败: {str(e)}")
+            return False
+    
+    def _generate_case_id(self) -> str:
+        """生成唯一的案例 ID"""
         import uuid
         return str(uuid.uuid4())[:8]
     
@@ -289,7 +404,7 @@ class CaseManager:
             f.write(text)
     
     def _save_dialog_log(self, case_id: str, dialog_log: List[Dict]):
-        """保存对话日志"""
+        """保存对话日志（整写）"""
         log_path = os.path.join(self.cases_dir, f"case_{case_id}", "dialog.jsonl")
         with open(log_path, 'w', encoding='utf-8') as f:
             for entry in dialog_log:
@@ -316,7 +431,6 @@ class CaseManager:
 def test_case_manager():
     """测试案例管理器功能"""
     import tempfile
-    import shutil
     
     # 创建临时目录
     temp_dir = tempfile.mkdtemp()
@@ -336,9 +450,21 @@ def test_case_manager():
         assert len(cases) == 1
         assert cases[0]['id'] == case_id
         
-        # 测试获取案例文本
+        # 测试获取/初始文本
         text = manager.get_case_text(case_id)
         assert text == ""
+        
+        # 构造一个伪上传对象
+        from io import BytesIO
+        content = "第一条 为了……这是测试文本。".encode("utf-8")
+        fake = BytesIO(content)
+        fake.name = "测试.txt"
+        ok = manager.upload_file_to_case(case_id, fake)
+        assert ok
+        
+        # 校验文本已合入
+        text2 = manager.get_case_text(case_id)
+        assert "第一条" in text2
         
         # 测试添加对话
         success = manager.add_dialog(case_id, "测试问题", "测试回答")
@@ -360,8 +486,8 @@ def test_case_manager():
         
     finally:
         # 清理临时目录
-        shutil.rmtree(temp_dir)
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 if __name__ == "__main__":
-    test_case_manager() 
+    test_case_manager()
