@@ -95,6 +95,22 @@ st.markdown("""
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         border-left: 4px solid #3498db;
     }
+    .retrieved-docs-box {
+        background: #f8f9fa;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 16px 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        border-left: 4px solid #27ae60;
+    }
+    .doc-chunk-box {
+        background: #ffffff;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        border: 1px solid #e9ecef;
+    }
     .metric-container {
         background: #ffffff;
         border-radius: 12px;
@@ -229,6 +245,110 @@ st.markdown("""
         border-color: #28a745;
         color: #155724;
     }
+    
+    /* 检索文档卡片样式 */
+    .retrieved-doc-card {
+        background: #ffffff;
+        border-radius: 12px;
+        padding: 16px;
+        margin: 12px 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e9ecef;
+        transition: all 0.3s ease;
+    }
+    
+    .retrieved-doc-card:hover {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+    
+    .retrieved-doc-card.history {
+        background: #f8f9fa;
+        border-color: #dee2e6;
+    }
+    
+    .doc-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+    }
+    
+    .doc-number {
+        background: #3498db;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .doc-source {
+        font-weight: 600;
+        color: #2c3e50;
+        font-size: 0.9rem;
+        flex: 1;
+    }
+    
+    .doc-score {
+        background: #e8f5e8;
+        color: #27ae60;
+        padding: 4px 8px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    
+    .doc-content {
+        color: #555;
+        line-height: 1.6;
+        margin-bottom: 12px;
+        font-size: 0.9rem;
+    }
+    
+    .doc-footer {
+        text-align: center;
+    }
+    
+    .view-full-btn {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+    
+    .view-full-btn:hover {
+        background: #2980b9;
+    }
+    
+    /* 改进expander样式 */
+    .streamlit-expanderHeader {
+        background: #f8f9fa !important;
+        border-radius: 8px !important;
+        border: 1px solid #dee2e6 !important;
+        padding: 12px 16px !important;
+        font-weight: 600 !important;
+        color: #2c3e50 !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: #e9ecef !important;
+        border-color: #adb5bd !important;
+    }
+    
+    .streamlit-expanderContent {
+        padding: 16px !important;
+        background: #ffffff !important;
+        border-radius: 0 0 8px 8px !important;
+        border: 1px solid #dee2e6 !important;
+        border-top: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -243,6 +363,10 @@ def initialize_session_state():
         st.session_state.ai_client = None
     if 'case_manager' not in st.session_state:
         st.session_state.case_manager = None
+    if 'show_latest_dialog' not in st.session_state:
+        st.session_state.show_latest_dialog = False
+    if 'latest_dialog_result' not in st.session_state:
+        st.session_state.latest_dialog_result = None
 
 
 def initialize_components():
@@ -740,18 +864,27 @@ def render_qa_section(case_id):
     with col1:
         if st.button("提交问题", type="primary", key=f"submit_{case_id}"):
             if user_question.strip():
+                # 处理问题但不在这里渲染
                 process_question(case_id, user_question.strip())
+                # 设置标志，表示需要显示最新对话
+                st.session_state.show_latest_dialog = True
+                st.rerun()
             else:
                 st.warning("请输入问题")
     
     with col2:
         if st.button("清空问题", key=f"clear_{case_id}"):
+            st.session_state.show_latest_dialog = False
             st.rerun()
     
     with col3:
         if st.button("查看历史", key=f"view_history_{case_id}"):
             st.session_state.show_full_history = not st.session_state.get('show_full_history', False)
             st.rerun()
+    
+    # 显示最新对话（如果用户提交了问题）
+    if st.session_state.get('show_latest_dialog', False):
+        render_latest_dialog(case_id)
     
     # 显示完整历史记录（如果用户点击了查看历史）
     if st.session_state.get('show_full_history', False):
@@ -780,7 +913,9 @@ def process_question(case_id, question):
         # 检索相关法条
         law_chunks = []
         if st.session_state.rag_system.is_index_available():
-            law_chunks = st.session_state.rag_system.retrieve_law_chunks(question, top_k=5)
+            raw_chunks = st.session_state.rag_system.retrieve_law_chunks(question, top_k=5)
+            # 格式化检索结果用于显示
+            law_chunks = st.session_state.rag_system.format_retrieved_chunks_for_display(raw_chunks)
         
         # 生成 AI 回答
         with st.spinner("正在生成回答..."):
@@ -788,18 +923,41 @@ def process_question(case_id, question):
                 case_text, law_chunks, question
             )
         
-        # 保存对话记录
+                # 保存对话记录（包含检索到的文档信息）
         st.session_state.case_manager.add_dialog(
-            case_id, question, result['answer'], result['citations']
+            case_id, question, result['answer'], result['citations'], result.get('retrieved_chunks', [])
         )
+        
+        # 将结果存储到session state中，供render_latest_dialog使用
+        st.session_state.latest_dialog_result = {
+            'question': question,
+            'answer': result['answer'],
+            'citations': result.get('citations', []),
+            'retrieved_chunks': result.get('retrieved_chunks', [])
+        }
         
         # 显示回答
         st.success("回答生成完成！")
         
-        # 显示问题和回答
-        st.markdown("### 最新对话")
+    except Exception as e:
+        st.error(f"处理问题失败: {str(e)}")
+
+
+def render_latest_dialog(case_id):
+    """渲染最新对话"""
+    if not st.session_state.get('latest_dialog_result'):
+        return
+    
+    result = st.session_state.latest_dialog_result
+    
+    st.markdown("### 最新对话")
+    
+    # 使用两列布局：左半边显示对话，右半边显示检索文档
+    col1, col2 = st.columns([3, 2])
+    
+    with col1:
         st.markdown("**问题：**")
-        st.markdown(f"<div class='dialog-box'>{question}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='dialog-box'>{result['question']}</div>", unsafe_allow_html=True)
         
         st.markdown("**回答：**")
         st.markdown(f"<div class='dialog-box'>{result['answer']}</div>", unsafe_allow_html=True)
@@ -814,9 +972,28 @@ def process_question(case_id, question):
                     <strong>内容：</strong>{citation['text']}
                 </div>
                 """, unsafe_allow_html=True)
-        
-    except Exception as e:
-        st.error(f"处理问题失败: {str(e)}")
+    
+    with col2:
+        # 显示检索到的相关文档（在右半边）
+        if result.get('retrieved_chunks'):
+            st.markdown("**检索到的相关文档**")
+            for i, chunk in enumerate(result['retrieved_chunks']):
+                # 使用改进的expander样式
+                with st.expander(f" {chunk['source']} (相似度: {chunk['score']:.3f})", expanded=False):
+                    st.markdown(f"""
+                    <div class='retrieved-doc-card'>
+                        <div class='doc-header'>
+                            <span class='doc-number'>#{i+1}</span>
+                            <span class='doc-source'>{chunk['source']}</span>
+                            <span class='doc-score'>相似度: {chunk['score']:.3f}</span>
+                        </div>
+                        <div class='doc-content'>
+                            {chunk['text']}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("未检索到相关文档")
 
 
 def render_dialog_history(case_id):
@@ -847,7 +1024,7 @@ def render_dialog_history(case_id):
             st.markdown(f"<div class='dialog-box'>{dialog['answer']}</div>", unsafe_allow_html=True)
             
             # 引用依据
-            if dialog['citations']:
+            if dialog.get('citations'):
                 st.markdown("**引用依据：**")
                 for citation in dialog['citations']:
                     st.markdown(f"""
@@ -856,6 +1033,29 @@ def render_dialog_history(case_id):
                         <strong>内容：</strong>{citation['text']}
                     </div>
                     """, unsafe_allow_html=True)
+            
+            # 显示检索到的相关文档（在对话下方）
+            if dialog.get('retrieved_chunks'):
+                st.markdown("---")
+                st.markdown("**📚 检索文档：**")
+                for i, chunk in enumerate(dialog['retrieved_chunks']):
+                    # 使用改进的expander样式
+                    with st.expander(f"📄 {chunk['source']}", expanded=False):
+                        st.markdown(f"""
+                        <div class='retrieved-doc-card history'>
+                            <div class='doc-header'>
+                                <span class='doc-number'>#{i+1}</span>
+                                <span class='doc-source'>{chunk['source']}</span>
+                                {f'<span class="doc-score">相似度: {chunk["score"]:.3f}</span>' if 'score' in chunk else ''}
+                            </div>
+                            <div class='doc-content'>
+                                {chunk['text']}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.markdown("---")
+                st.info("无检索文档")
 
 
 def render_dialog_history_simple(case_id):

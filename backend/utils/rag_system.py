@@ -195,12 +195,42 @@ class RAGSystem:
                 if 0 <= idx < len(self.metadata):
                     m = self.metadata[idx]
                     results.append(
-                        {"text": m["text"], "source": m["source"], "score": float(s), "chunk_id": m["chunk_id"]}
+                        {
+                            "text": m["text"], 
+                            "source": m["source"], 
+                            "score": float(s), 
+                            "chunk_id": m["chunk_id"],
+                            "full_text": m.get("full_text", m["text"]),  # 添加完整文本
+                            "chunk_index": idx  # 添加chunk索引
+                        }
                     )
             return results
         except Exception as e:
             print("[RAG] retrieve failed:", e)
             return []
+
+    def format_retrieved_chunks_for_display(self, chunks: List[Dict]) -> List[Dict]:
+        """
+        格式化检索到的chunks用于前端显示
+        
+        Args:
+            chunks: 检索到的chunks列表
+            
+        Returns:
+            格式化后的chunks列表
+        """
+        formatted_chunks = []
+        for i, chunk in enumerate(chunks):
+            formatted_chunk = {
+                "id": i + 1,
+                "text": chunk["text"],
+                "source": chunk["source"],
+                "score": chunk["score"],
+                "full_text": chunk.get("full_text", chunk["text"]),
+                "preview": chunk["text"][:100] + "..." if len(chunk["text"]) > 100 else chunk["text"]
+            }
+            formatted_chunks.append(formatted_chunk)
+        return formatted_chunks
 
     def is_index_available(self) -> bool:
         return self.index_path.exists() and self.meta_path.exists()

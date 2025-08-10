@@ -1,10 +1,9 @@
 
 #启动
 set APP_PORT=8501
-cd /d E:\Lawmedol\backend
+cd backend
 streamlit run app.py --server.port %APP_PORT% --server.address 127.0.0.1 --server.headless true
-
-cd /d E:\Lawmedol\frontend
+cd frontend
 set APP_URL=http://127.0.0.1:8501
 npm start
 
@@ -18,3 +17,10 @@ del /f /q legal_corpus\law_meta.pkl   2>nul
 conda activate lawmedol
 cd /d E:\Lawmedol\backend
 python -c "from utils.rag_system import build_index; build_index(corpus_dir='backend/legal_corpus', index_dir='backend/legal_corpus')"
+
+
+#设置代理
+//git config --global --unset http.proxy
+//git config --global --unset https.proxy
+//git config --global http.proxy http://localhost:7897
+//git config --global https.proxy https://localhost:7897

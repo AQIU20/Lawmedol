@@ -278,9 +278,16 @@ class CaseManager:
             logger.exception(f"文件上传失败: {str(e)}")
             return False
     
-    def add_dialog(self, case_id: str, question: str, answer: str, citations: List[Dict] = None) -> bool:
+    def add_dialog(self, case_id: str, question: str, answer: str, citations: List[Dict] = None, retrieved_chunks: List[Dict] = None) -> bool:
         """
         添加对话记录
+        
+        Args:
+            case_id: 案例ID
+            question: 用户问题
+            answer: AI回答
+            citations: 引用依据
+            retrieved_chunks: 检索到的相关文档chunks
         """
         try:
             dialog_log = self._load_dialog_log(case_id)
@@ -289,7 +296,8 @@ class CaseManager:
                 'timestamp': datetime.now().isoformat(),
                 'question': question,
                 'answer': answer,
-                'citations': citations or []
+                'citations': citations or [],
+                'retrieved_chunks': retrieved_chunks or []  # 添加检索到的文档chunks
             }
             
             dialog_log.append(dialog_entry)

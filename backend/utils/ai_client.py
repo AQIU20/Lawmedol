@@ -43,7 +43,7 @@ class AIClient:
             user_question: 用户问题
             
         Returns:
-            包含回答和引用依据的字典
+            包含回答、引用依据和检索文档的字典
         """
         try:
             # 构建上下文
@@ -68,6 +68,9 @@ class AIClient:
             # 解析回答和引用依据
             parsed_result = self._parse_answer(answer, law_chunks)
             
+            # 添加检索到的文档信息
+            parsed_result['retrieved_chunks'] = law_chunks
+            
             return parsed_result
             
         except Exception as e:
@@ -75,7 +78,8 @@ class AIClient:
             return {
                 'answer': f"抱歉，生成回答时出现错误: {str(e)}",
                 'citations': [],
-                'has_citations': False
+                'has_citations': False,
+                'retrieved_chunks': []
             }
     
     def _build_context(self, case_text: str, law_chunks: List[Dict]) -> str:
